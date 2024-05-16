@@ -130,6 +130,9 @@ void ProcessManager::broadcast(int pid) {
         // BEGIN HINTS
         // Wake up others
         // END HINTS
+
+        // TASK 1 - broadcast
+        condition->Broadcast(lockList[pid]); 
         
        
       

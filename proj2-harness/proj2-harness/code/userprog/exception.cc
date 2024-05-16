@@ -286,7 +286,9 @@ void exitImpl() {
     //See pcb.cc on how to get the exit code and see processmanager.cc on the above notification.
     //END HINTS
 
-    
+    // TASK 2 - exitimpl v
+    currentThread->space->getPCB()->status = status;
+    processManager->broadcast(currPID);
    
 
     //Delete the current space of this process
@@ -477,6 +479,10 @@ int openImpl(char* filename) {
    // END HINTS
    // See useropenfile.h and pcb.cc on UserOpenFile class and its methods.
    // See sysopenfile.h and openfilemanager.cc for SysOpenFile class and its methods.
+
+   // TASK 3 - openimpl v
+    currUserFile.indexInSysOpenFileList = index;
+    currUserFile.currOffsetInFile = 0;
     
   
  
@@ -562,8 +568,12 @@ void writeImpl() {
         //END HINTS 
        // See useropenfile.h and pcb.cc on UserOpenFile class and its methods.
        // See sysopenfile.h and openfilemanager.cc for SysOpenFile class and its methods.
-    
 
+        // TASK 5 writeimpl v
+        SysOpenFile* currSysFile = openFileManager->getFile(userFile->indexInSysOpenFileList);
+        int offset_val = currSysFile->file->WriteAt(buffer, size, userFile->currOffsetInFile);
+
+        userFile->currOffsetInFile += offset_val;
 
     
         
@@ -605,8 +615,13 @@ int readImpl() {
         // END HINTS 
         // See useropenfile.h and pcb.cc on UserOpenFile class and its methods.
         // See sysopenfile.h and openfilemanager.cc for SysOpenFile class and its methods.
- 
+
+        // TASK 5 readimpl v
+        SysOpenFile* currSysFile = openFileManager->getFile(userFile->indexInSysOpenFileList);
+        int offset_val = currSysFile->file->ReadAt(buffer, size, userFile->currOffsetInFile);
         
+
+        userFile->currOffsetInFile += offset_val;
        
       
      
@@ -639,7 +654,16 @@ void closeImpl() {
        // See useropenfile.h and pcb.cc on UserOpenFile class and its methods.
        // See sysopenfile.h and openfilemanager.cc for SysOpenFile class and its methods.
 
-       
+        // TASK 4 - closeimpl v
+        // char* nameOfFile = userFile->fileName;
+        int index = userFile->indexInSysOpenFileList;
+        SysOpenFile* closeSysFile = openFileManager->getFile(index);
+        closeSysFile->closedBySingleProcess();
+
+        
+
+        PCB* pcb = (currentThread->space)->getPCB();
+        pcb->removeFile(fileID);
         
        
       
