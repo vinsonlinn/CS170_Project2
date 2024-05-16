@@ -166,7 +166,17 @@ AddrSpace::AddrSpace(const AddrSpace* other, PCB* newpcb) {
         //See memoryManager.cc on how to allocate memory pages.
         //Also (other->pageTable)[i] gives the i-th logical page table entry of "other" process.
         //Thus you will fill code inside the loop body of  for (int i = 0; i < numPages; i++) {  }
+        
+        for (unsigned int i = 0; i < numPages; i++) {
+            pageTable[i].virtualPage = i;
+            pageTable[i].physicalPage = memoryManager->getPage();
+            pageTable[i].valid = other->pageTable[i].valid;
+            pageTable[i].use = other->pageTable[i].use;
+            pageTable[i].dirty = other->pageTable[i].dirty;
+            pageTable[i].readOnly = other->pageTable[i].readOnly;
 
+        }// Set up the page table for the new process and allocate physical pages for each page in the new process under newpcb
+        
 
         memoryManager->lock->Release();
 
@@ -178,6 +188,14 @@ AddrSpace::AddrSpace(const AddrSpace* other, PCB* newpcb) {
         //To get the physical addres (by byte) of the other process,
         //you can use (other->pageTable)[i].physicalPage * PageSize.
         //Then you can use bzero() to clean up and  use , bcopy() to complete the copy.
+
+        for (unsigned int i = 0; i < numPages; i++) {
+            int physAddr = pageTable[i].physicalPage * PageSize;
+            bzero(&(machine->mainMemory[physAddr]), PageSize);
+            bcopy(&(machine->mainMemory[(other->pageTable)[i].physicalPage * PageSize]), &(machine->mainMemory[physAddr]), PageSize);
+        }//Copy page content of the other process to the new address space page by page to complete process content duplication
+
+
 
         machineLock->Release();
     }

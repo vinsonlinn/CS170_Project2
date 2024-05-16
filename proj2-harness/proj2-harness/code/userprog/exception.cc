@@ -179,19 +179,22 @@ int forkImpl() {
     // Add this newly created process to processManager using addProcess.
     // END  HINTS
 
-    
-    int currPID = 0;//Change it. 
-    int newPID = -1;//Change it
+    int currPID = currentThread->space->getPCB()->getPID();
+    int newPID = processManager->getPID();
     if (newPID == -1) {
           fprintf(stderr, "Process %d is unable to fork a new process\n", currPID);
           return -1;
     }
-    
-   
+    PCB* newpcb = new PCB(newPID, currPID);
+    newpcb->status = P_RUNNING;
+    newpcb->process = childThread;
+    childThread->space = new AddrSpace(currentThread->space, newpcb);
+    processManager->addProcess(newpcb, newPID);
   
     // BEGIN HINTS
     // Make a copy of the address space using AddrSpace::AddrSpace()
     // END HINTS
+    AddrSpace* childAddrSpace = new AddrSpace(currentThread->space, newpcb);
 
 
     int childNumPages = childThread->space->getNumPages();
@@ -206,6 +209,8 @@ int forkImpl() {
     // Save states/registers of the corresponding childThread for context switch.
     // See addrspace.cc and thread.cc on how to save the states.
     // END HINTS
+    childThread->space->SaveState();
+    childThread->SaveUserState();
     
 
     // Mandatory printout of the forked process
@@ -259,12 +264,21 @@ void yieldImpl() {
     //and page table using AddrSpace::RestoreState()).
     //See addrspace.cc and thread.cc on how to save and restore states.
     //END HINTS
-    
-   
-  
- 
 
+    // Save the corresponding user process's register states
+    if (currentThread->space != NULL) {
+        currentThread->SaveUserState();
+        currentThread->space->SaveState();
+    }
 
+    // Yield using currentThread->Yield()
+    currentThread->Yield();
+
+    // Restore the corresponding user process's states
+    if (currentThread->space != NULL) {
+        currentThread->RestoreUserState();
+        currentThread->space->RestoreState();
+    }
 }
 
 //----------------------------------------------------------------------
@@ -285,9 +299,20 @@ void exitImpl() {
     //Also let other processes  know this process  exits through  processManager. 
     //See pcb.cc on how to get the exit code and see processmanager.cc on the above notification.
     //END HINTS
+    
+
 
     
-   
+   // Set the exit status in the PCB
+    PCB* pcb = currentThread->space->getPCB();
+    pcb->status = status;
+
+    // Notify other processes that this process has exited
+    processManager->broadcast(currPID);
+
+
+
+
 
     //Delete the current space of this process
     delete currentThread->space;
@@ -313,8 +338,12 @@ int joinImpl() {
    // Change the status of this process  in its PCB as P_RUNNING.
    // END HINTS
    //
-    
-   
+
+    if (processManager->getStatus(otherPID) == -1) {
+        return processManager->getStatus(otherPID);
+    }
+    processManager->join(otherPID);
+    currentThread->space->getPCB()->status = P_RUNNING; 
   
  
 
@@ -478,7 +507,10 @@ int openImpl(char* filename) {
    // See useropenfile.h and pcb.cc on UserOpenFile class and its methods.
    // See sysopenfile.h and openfilemanager.cc for SysOpenFile class and its methods.
     
-  
+
+    currUserFile.indexInSysOpenFileList = index;
+    currUserFile.currOffsetInFile = 0;   
+    
  
     int currFileID = currentThread->space->getPCB()->addFile(currUserFile);
     return currFileID;
@@ -550,6 +582,7 @@ void writeImpl() {
        //Fetch data from the user space to this system buffer using  userReadWrite().
        //END HINTS
         
+        userReadWrite(writeAddr, buffer, size, USER_READ);
         
         UserOpenFile* userFile = currentThread->space->getPCB()->getFile(fileID);
         if (userFile == NULL) {
@@ -564,7 +597,14 @@ void writeImpl() {
        // See sysopenfile.h and openfilemanager.cc for SysOpenFile class and its methods.
     
 
+        SysOpenFile* sysFile = openFileManager->getFile(userFile->indexInSysOpenFileList);
 
+        // Use SysOpenFile->file's writeAt() to write out the above buffer with size listed
+        int numActualBytesWritten = sysFile->file->WriteAt(buffer, size, userFile->currOffsetInFile);
+
+        // Increment the current offset by the actual number of bytes written
+        userFile->currOffsetInFile += numActualBytesWritten;
+    
     
         
     }
@@ -577,7 +617,7 @@ void writeImpl() {
 
 int readImpl() {
 
-    //int readAddr = machine->ReadRegister(4);
+    int readAddr = machine->ReadRegister(4);
     int size = machine->ReadRegister(5);
     int fileID = machine->ReadRegister(6);
     char* buffer = new char[size + 1];
@@ -606,8 +646,17 @@ int readImpl() {
         // See useropenfile.h and pcb.cc on UserOpenFile class and its methods.
         // See sysopenfile.h and openfilemanager.cc for SysOpenFile class and its methods.
  
-        
-       
+        SysOpenFile* sysFile = openFileManager->getFile(userFile->indexInSysOpenFileList);
+        // if (sysFile == NULL) {
+        //     return 0;
+        // }
+
+        // Use SysOpenFile->file's ReadAt() to read the file at selected offset to this system buffer buffer[]
+        int offset_val = sysFile->file->ReadAt(buffer, size, userFile->currOffsetInFile);
+
+        // Adjust the offset in userFile to reflect the current position
+        userFile->currOffsetInFile += offset_val;
+  
       
      
     
@@ -615,6 +664,8 @@ int readImpl() {
     //BEGIN HINTS
     //Now copy data from the system buffer to the targted main memory space using userReadWrite()
     //END HINTS
+    int numBytesCopied = userReadWrite(readAddr, buffer, size, USER_READ);
+
     
     delete [] buffer;
     return numActualBytesRead;
@@ -638,11 +689,10 @@ void closeImpl() {
        // END HINTS
        // See useropenfile.h and pcb.cc on UserOpenFile class and its methods.
        // See sysopenfile.h and openfilemanager.cc for SysOpenFile class and its methods.
-
        
-        
-       
-      
+       SysOpenFile* sysFile = openFileManager->getFile(userFile->indexInSysOpenFileList);
+        sysFile->closedBySingleProcess();
+        currentThread->space->getPCB()->removeFile(fileID);
     }
 }
 

@@ -122,7 +122,7 @@ void ProcessManager::join(int pid) {
 
 void ProcessManager::broadcast(int pid) {
 
-    //Lock* lock = lockList[pid]; //This line is needed when using a lock specific for pid
+    Lock* lock = lockList[pid]; //This line is needed when using a lock specific for pid
     Condition* condition = conditionList[pid];
     pcbStatuses[pid] = pcbList[pid]->status;
 
@@ -130,9 +130,9 @@ void ProcessManager::broadcast(int pid) {
         // BEGIN HINTS
         // Wake up others
         // END HINTS
-        
-       
-      
+        lock->Acquire();   
+        condition->Broadcast(lock);    // changed from lockList[pid] to lock
+        lock->Release();
     }
 }
 
