@@ -190,7 +190,7 @@ AddrSpace::AddrSpace(const AddrSpace* other, PCB* newpcb) {
         //Then you can use bzero() to clean up and  use , bcopy() to complete the copy.
 
         for (unsigned int i = 0; i < numPages; i++) {
-            int physAddr = pageTable[i].physicalPage * PageSize;
+            int physAddr = (pageTable[i].physicalPage) * PageSize;
             bzero(&(machine->mainMemory[physAddr]), PageSize);
             bcopy(&(machine->mainMemory[(other->pageTable)[i].physicalPage * PageSize]), &(machine->mainMemory[physAddr]), PageSize);
         }//Copy page content of the other process to the new address space page by page to complete process content duplication

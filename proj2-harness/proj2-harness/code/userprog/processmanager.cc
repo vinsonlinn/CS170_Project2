@@ -105,6 +105,9 @@ void ProcessManager::join(int pid) {
     //Decrement   processesWaitingOnPID[pid].
     //END HINTS
     
+    processesWaitingOnPID[pid]++; // Increment processesWaitingOnPID[pid]
+    conditionForOtherProcess->Wait(lockForOtherProcess); // Conditional waiting on conditionForOtherProcess
+    processesWaitingOnPID[pid]--; // Decrement processesWaitingOnPID[pid]
    
   
 

@@ -271,7 +271,6 @@ void yieldImpl() {
         currentThread->space->SaveState();
     }
 
-    // Yield using currentThread->Yield()
     currentThread->Yield();
 
     // Restore the corresponding user process's states
